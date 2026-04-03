@@ -1,0 +1,64 @@
+# base.yaml — METConfig hyperparameters
+# All values match experiments.md defaults
+
+model:
+  L: 64            # sequence length
+  D: 256           # shared state width
+
+  # Attention
+  D_k: 64
+  H: 4
+  beta: 1.0
+
+  # Spline
+  N_v: 16
+  N_a: 16
+  M_v: 32
+  M_a: 32
+  lam_spline: 1.0e-3
+
+  # Hopfield
+  K_v: 64
+  K_a: 64
+  beta_HN: 1.0
+  lambda_cross: 0.05
+  window: 3
+
+solver:
+  eta: 0.01
+  T_iter: 50
+  grad_clip: 1.0
+  early_stop_eps: 1.0e-6
+
+training:
+  # Loss weights (lambda_gen dominant)
+  lambda_gen: 1.0
+  lambda_sync: 0.1
+  lambda_jepa: 0.1
+  lambda_rank: 0.05
+  lambda_sem: 0.1
+  lambda_temp: 0.1
+
+  # EqProp
+  s: 0.01                   # nudge strength
+  min_attractor_agreement: 0.90
+
+  # JEPA
+  mu: 0.99                  # EMA teacher decay
+  mask_ratio_v: 0.4
+  mask_ratio_a: 0.4
+
+  # Ranking
+  margin: 0.5
+
+  # Contrastive temperatures
+  tau_sem: 0.07
+  tau_temp: 0.07
+
+  # Optimizer
+  lr: 3.0e-4
+  weight_decay: 0.01
+  grad_clip_global: 1.0
+
+  batch_size: 8
+  n_epochs: 100

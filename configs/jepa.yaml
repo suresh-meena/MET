@@ -1,0 +1,33 @@
+# jepa.yaml — Cross-modal JEPA config (extends base.yaml)
+# For Tier 5.4 masked JEPA on AudioSet-10
+
+defaults:
+  - base
+
+model:
+  L: 64
+  D: 256
+  H: 4
+  D_k: 64
+  K_v: 64
+  K_a: 64
+  lambda_cross: 0.05
+
+training:
+  lambda_gen: 0.5     # reduced in favor of JEPA
+  lambda_jepa: 0.5    # JEPA dominant for pretraining
+  lambda_rank: 0.05
+  lambda_sem: 0.2     # semantic alignment important for AudioSet
+  lambda_temp: 0.0    # no temporal loss during pretraining
+  lambda_sync: 0.0
+
+  mu: 0.999           # slower EMA for stable teacher (AudioSet scale)
+  mask_ratio_v: 0.5   # higher mask ratio for harder pretraining task
+  mask_ratio_a: 0.5
+
+  batch_size: 64
+  n_epochs: 100
+  lr: 3.0e-4
+
+  # Disable EqProp for pretraining (BPTT only)
+  use_eqprop: false

@@ -1,0 +1,45 @@
+# foley.yaml — Foley generation config (extends base.yaml)
+# Specialized for VGGSound-10 / Foley task (Tier 5.2)
+
+defaults:
+  - base
+
+model:
+  L: 64
+  D: 256
+  H: 4
+  D_k: 64
+
+  # Larger Hopfield banks for audio event diversity
+  K_a: 128
+  K_v: 64
+
+  # Larger window for longer audio onsets
+  window: 5
+  lambda_cross: 0.1   # start slightly higher for Foley (strong AV correlation)
+
+solver:
+  T_iter: 50
+  eta: 0.005          # smaller eta for Foley (energy landscape less smooth)
+
+training:
+  lambda_gen: 1.0
+  lambda_sync: 0.2    # stronger sync loss for Foley timing
+  lambda_jepa: 0.1
+  lambda_rank: 0.1
+  lambda_sem: 0.1
+  lambda_temp: 0.2    # stronger temporal for Foley window alignment
+
+  batch_size: 16
+  n_epochs: 200
+  lr: 1.0e-4          # smaller LR for stability with Foley losses
+
+audio:
+  sample_rate: 16000
+  n_mels: 128
+  hop_length: 160
+  n_fft: 1024
+
+video:
+  fps: 25
+  D_tok: 768          # CLIP-ViT-B/16 feature dimension
