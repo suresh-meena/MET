@@ -12,6 +12,7 @@ met/tokenizers/ - Video and audio front-ends
 met/heads/      - Output heads (audio, video)
 met/utils/      - Diagnostics and gradient checking
 experiments/    - Tier 0–5 experiment runners
+  └── lagged_shared_source/ - synthetic cross-modal retrieval stress test
 tests/          - Unit + integration tests (run first)
 configs/        - OmegaConf YAML configs
 ```

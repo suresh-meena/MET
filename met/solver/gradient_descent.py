@@ -79,9 +79,13 @@ def run_deterministic_solver(
         attention_only: use energy.forward_attention_only (Phase A)
 
     Returns:
-        x_v_final:  (B, L, D)     final video state (detached)
-        x_a_final:  (B, L, D)     final audio state (detached)
-        logs:       list of dicts  per-step diagnostics
+        x_v_final:  (B, L, D) final video state.
+            - detached when create_graph=False (inference mode)
+            - graph-connected when create_graph=True (BPTT mode)
+        x_a_final:  (B, L, D) final audio state.
+            - detached when create_graph=False
+            - graph-connected when create_graph=True
+        logs: list of dicts per-step diagnostics
     """
     x_v = x_v.clone()
     x_a = x_a.clone()
@@ -137,4 +141,6 @@ def run_deterministic_solver(
         if fp_residual < early_stop_eps:
             break
 
+    if create_graph:
+        return x_v, x_a, logs
     return x_v.detach(), x_a.detach(), logs
