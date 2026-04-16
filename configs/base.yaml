@@ -10,12 +10,16 @@ model:
   H: 4
   beta: 1.0
 
-  # Spline
+  # Fixed basis compression
+  basis_v: bspline
+  basis_a: bspline
   N_v: 16
   N_a: 16
   M_v: 32
   M_a: 32
   lam_spline: 1.0e-3
+  basis_degree_v: 3
+  basis_degree_a: 3
 
   # Hopfield
   K_v: 64
@@ -23,6 +27,7 @@ model:
   beta_HN: 1.0
   lambda_cross: 0.05
   window: 3
+  learn_lambda_cross: false
 
 solver:
   eta: 0.01
@@ -59,6 +64,8 @@ training:
   lr: 3.0e-4
   weight_decay: 0.01
   grad_clip_global: 1.0
+  use_amp: false
+  amp_dtype: bfloat16
 
   batch_size: 8
   n_epochs: 100

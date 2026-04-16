@@ -8,10 +8,17 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
+from pathlib import Path
+import sys
 
 import numpy as np
 import pytest
 import torch
+
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from met.core.energy import METConfig, METEnergy
 from met.utils.grad_check import finite_difference_grad

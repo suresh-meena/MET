@@ -15,8 +15,8 @@ For modality m, with complementary modality m':
     E_m^HN      = −(1/β_HN) Σ_ℓ log Σ_μ exp(β_HN s_{ℓμ}^m)
 
 Design decisions:
-  - lambda_cross is nn.Parameter (learnable), clamped to [0,1] in forward.
-    Init small (0.05); anneal upward only if retrieval quality improves (Exp 1.2).
+  - lambda_cross can be fixed or learnable, clamped to [0,1] in forward.
+    The writeup treats it as a retrieval hyperparameter, so the default is fixed.
   - Prototypes Xi are L2-normalized AT USE TIME (not stored normalized).
     This prevents norm collapse during training.
   - Temporal smoothing uses F.avg_pool1d with count_include_pad=False
@@ -58,15 +58,18 @@ class HopfieldMemoryBank(nn.Module):
         beta_HN: float = 1.0,
         lambda_cross: float = 0.05,
         window: int = 3,
+        learn_lambda_cross: bool = False,
     ) -> None:
         super().__init__()
         self.K = K
         self.beta_HN = beta_HN
         self.window = window
 
-        # lambda_cross: unconstrained parameter, clamped in forward
-        # Start small per paper recommendation; Exp 1.2 determines safe range
-        self.lambda_cross = nn.Parameter(torch.tensor(float(lambda_cross)))
+        lam = torch.tensor(float(lambda_cross))
+        if learn_lambda_cross:
+            self.lambda_cross = nn.Parameter(lam)
+        else:
+            self.register_buffer("lambda_cross", lam)
 
         # Prototype matrix: (K, D)
         # Normalized at use time via F.normalize — not stored normalized
@@ -112,6 +115,17 @@ class HopfieldMemoryBank(nn.Module):
     # Forward
     # ------------------------------------------------------------------
 
+    @torch.no_grad()
+    def set_lambda_cross(self, value: float) -> None:
+        """Set lambda_cross without changing whether it is fixed or learnable."""
+        self.lambda_cross.copy_(
+            torch.tensor(
+                float(value),
+                device=self.lambda_cross.device,
+                dtype=self.lambda_cross.dtype,
+            )
+        )
+
     def forward(self, g_m: Tensor, g_cross: Tensor) -> Tensor:
         """
         Compute the Hopfield memory energy for one modality.
@@ -151,5 +165,6 @@ class HopfieldMemoryBank(nn.Module):
     def extra_repr(self) -> str:
         return (
             f"K={self.K}, beta_HN={self.beta_HN}, "
-            f"lambda_cross_init={self.lambda_cross.item():.3f}, window={self.window}"
+            f"lambda_cross_init={self.lambda_cross.detach().item():.3f}, "
+            f"window={self.window}"
         )

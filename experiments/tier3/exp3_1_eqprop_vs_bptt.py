@@ -75,7 +75,14 @@ def run_exp3_1():
     for s in s_values:
         eqprop = EqPropEstimator(energy, s=s, T=T)
         result = eqprop.estimate_gradient(
-            x_v, x_a_init, mel_target, eta=eta, freeze_v=True
+            x_v,
+            x_a_init,
+            eta=eta,
+            freeze_v=True,
+            nudge_objective=lambda _x_v, x_a_state: nn.functional.mse_loss(
+                audio_head(x_a_state),
+                mel_target,
+            ),
         )
 
         # Collect EqProp gradients as list (same order as BPTT)

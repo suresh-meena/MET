@@ -23,14 +23,12 @@ Incremental build order (§7):
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
-import torch
 import torch.nn as nn
 from torch import Tensor
 
+from met.core.basis import build_basis_cache
 from met.core.layernorm import TokenwiseLayerNorm
-from met.core.spline import BSplineCache
 from met.core.attention import ContinuousAttentionEnergy
 from met.core.hopfield import HopfieldMemoryBank
 
@@ -51,12 +49,16 @@ class METConfig:
     H: int = 4           # number of heads
     beta: float = 1.0    # attention inverse temperature
 
-    # Spline (can differ per modality; default shared)
+    # Fixed basis compression (can differ per modality; default shared)
+    basis_v: str = "bspline"
+    basis_a: str = "bspline"
     N_v: int = 16        # video spline basis size
     N_a: int = 16        # audio spline basis size
     M_v: int = 32        # video quadrature nodes
     M_a: int = 32        # audio quadrature nodes
     lam_spline: float = 1e-3  # ridge regularization
+    basis_degree_v: int = 3
+    basis_degree_a: int = 3
 
     # Hopfield
     K_v: int = 64        # video prototypes
@@ -64,6 +66,7 @@ class METConfig:
     beta_HN: float = 1.0 # Hopfield inverse temperature
     lambda_cross: float = 0.05  # cross-modal blending (init small)
     window: int = 3      # temporal smoothing window
+    learn_lambda_cross: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -92,9 +95,23 @@ class METEnergy(nn.Module):
         self.ln_v = TokenwiseLayerNorm(D)
         self.ln_a = TokenwiseLayerNorm(D)
 
-        # Spline caches (modality-specific, all buffers)
-        cache_v = BSplineCache(cfg.L, cfg.N_v, cfg.M_v, cfg.lam_spline)
-        cache_a = BSplineCache(cfg.L, cfg.N_a, cfg.M_a, cfg.lam_spline)
+        # Fixed basis caches (modality-specific, all buffers)
+        cache_v = build_basis_cache(
+            L=cfg.L,
+            family=cfg.basis_v,
+            N=cfg.N_v,
+            M=cfg.M_v,
+            lam=cfg.lam_spline,
+            degree=cfg.basis_degree_v,
+        )
+        cache_a = build_basis_cache(
+            L=cfg.L,
+            family=cfg.basis_a,
+            N=cfg.N_a,
+            M=cfg.M_a,
+            lam=cfg.lam_spline,
+            degree=cfg.basis_degree_a,
+        )
 
         # Shared continuous-attention block
         self.attention = ContinuousAttentionEnergy(
@@ -104,10 +121,22 @@ class METEnergy(nn.Module):
         # Per-modality Hopfield banks
         # D_cross == D since we use a shared state width
         self.hopfield_v = HopfieldMemoryBank(
-            D, D, cfg.K_v, cfg.beta_HN, cfg.lambda_cross, cfg.window
+            D,
+            D,
+            cfg.K_v,
+            cfg.beta_HN,
+            cfg.lambda_cross,
+            cfg.window,
+            learn_lambda_cross=cfg.learn_lambda_cross,
         )
         self.hopfield_a = HopfieldMemoryBank(
-            D, D, cfg.K_a, cfg.beta_HN, cfg.lambda_cross, cfg.window
+            D,
+            D,
+            cfg.K_a,
+            cfg.beta_HN,
+            cfg.lambda_cross,
+            cfg.window,
+            learn_lambda_cross=cfg.learn_lambda_cross,
         )
 
     # ------------------------------------------------------------------
@@ -195,5 +224,6 @@ class METEnergy(nn.Module):
     def extra_repr(self) -> str:
         return (
             f"L={self.cfg.L}, D={self.cfg.D}, H={self.cfg.H}, "
-            f"K_v={self.cfg.K_v}, K_a={self.cfg.K_a}"
+            f"K_v={self.cfg.K_v}, K_a={self.cfg.K_a}, "
+            f"basis_v={self.cfg.basis_v}, basis_a={self.cfg.basis_a}"
         )

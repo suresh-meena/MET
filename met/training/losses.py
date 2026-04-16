@@ -200,19 +200,17 @@ def J_temp(
     h_v_win = F.normalize(h_v_win, dim=-1)  # (B, W, D_p)
     h_a_win = F.normalize(h_a_win, dim=-1)  # (B, W, D_p)
 
-    total = 0.0
-    for b in range(B):
-        # (W, D_p) for clip b
-        hv = h_v_win[b]  # (W, D_p)
-        ha = h_a_win[b]  # (W, D_p)
+    # Batched within-clip similarity: (B, W, W)
+    sim = torch.matmul(h_a_win, h_v_win.transpose(-2, -1)) / tau
+    labels = torch.arange(W, device=sim.device).expand(B, W)
 
-        # Within-clip similarity: (W, W)
-        sim = torch.einsum("id, jd -> ij", ha, hv) / tau
-
-        labels = torch.arange(W, device=sim.device)
-        total = total + (F.cross_entropy(sim, labels) + F.cross_entropy(sim.T, labels)) / 2.0
-
-    return total / B
+    # Compute InfoNCE both directions over the window axis and average.
+    loss_a2v = F.cross_entropy(sim.reshape(B * W, W), labels.reshape(B * W))
+    loss_v2a = F.cross_entropy(
+        sim.transpose(-2, -1).reshape(B * W, W),
+        labels.reshape(B * W),
+    )
+    return (loss_a2v + loss_v2a) / 2.0
 
 
 # ---------------------------------------------------------------------------

@@ -35,7 +35,7 @@ Stability:
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Callable, Optional
 
 import torch
 from torch import Tensor
@@ -55,6 +55,8 @@ def run_deterministic_solver(
     early_stop_eps: float = 1e-6,
     create_graph: bool = False,
     attention_only: bool = False,
+    extra_objective: Optional[Callable[[Tensor, Tensor], Tensor]] = None,
+    extra_scale: float = 1.0,
 ) -> tuple[Tensor, Tensor, list[dict]]:
     """
     Run T steps of gradient descent on the unfrozen state variable(s).
@@ -77,6 +79,10 @@ def run_deterministic_solver(
         early_stop_eps: stop if ‖∇_x E‖ < eps
         create_graph:   if True, keep computation graph (BPTT training mode)
         attention_only: use energy.forward_attention_only (Phase A)
+        extra_objective:
+                        optional scalar objective J(x_v, x_a) added to the
+                        energy during state updates, e.g. EqProp nudge.
+        extra_scale:    scalar multiplier for extra_objective
 
     Returns:
         x_v_final:  (B, L, D) final video state.
@@ -104,7 +110,14 @@ def run_deterministic_solver(
     forward_fn = energy.forward_attention_only if attention_only else energy.forward
 
     for t in range(T):
-        E, comps = forward_fn(x_v, x_a, freeze_v=freeze_v, freeze_a=freeze_a)
+        E_base, comps = forward_fn(x_v, x_a, freeze_v=freeze_v, freeze_a=freeze_a)
+        E = E_base
+        if extra_objective is not None:
+            E_extra = extra_objective(x_v, x_a)
+            E = E_base + extra_scale * E_extra
+            comps = dict(comps)
+            comps["E_extra"] = E_extra.detach().item()
+            comps["E_augmented"] = E.detach().item()
 
         # Compute gradients w.r.t. unfrozen states
         grads = torch.autograd.grad(

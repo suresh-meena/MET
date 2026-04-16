@@ -33,7 +33,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from met.core.spline import BSplineCache
+from met.core.basis import FixedBasisCache
 
 
 class ContinuousAttentionEnergy(nn.Module):
@@ -44,8 +44,8 @@ class ContinuousAttentionEnergy(nn.Module):
         D:        state width (shared for both modalities)
         D_k:      key/query dimension per head
         H:        number of attention heads
-        cache_v:  BSplineCache for visual modality
-        cache_a:  BSplineCache for audio modality
+        cache_v:  fixed basis cache for visual modality
+        cache_a:  fixed basis cache for audio modality
         beta:     inverse temperature β (scales scores before softmax)
     """
 
@@ -54,8 +54,8 @@ class ContinuousAttentionEnergy(nn.Module):
         D: int,
         D_k: int,
         H: int,
-        cache_v: BSplineCache,
-        cache_a: BSplineCache,
+        cache_v: FixedBasisCache,
+        cache_a: FixedBasisCache,
         beta: float = 1.0,
     ) -> None:
         super().__init__()
@@ -80,14 +80,14 @@ class ContinuousAttentionEnergy(nn.Module):
     # ------------------------------------------------------------------
 
     def _project_and_encode(
-        self, g: Tensor, cache: BSplineCache
+        self, g: Tensor, cache: FixedBasisCache
     ) -> tuple[Tensor, Tensor]:
         """
         Project g into Q and K, then compress K via spline.
 
         Args:
             g:     (B, L, D)         normalized token states
-            cache: BSplineCache      modality-specific spline cache
+            cache: FixedBasisCache   modality-specific basis cache
 
         Returns:
             Q:      (B, L, H, D_k)   query vectors
@@ -155,18 +155,14 @@ class ContinuousAttentionEnergy(nn.Module):
         """
         Q_v, Kq_v = self._project_and_encode(g_v, self.cache_v)
         Q_a, Kq_a = self._project_and_encode(g_a, self.cache_a)
-        
-        # Optimization: use precomputed log weights
-        w_log = self.cache_v.log_w_quad
 
-        E_intra_v = self._log_partition(Q_v, Kq_v, w_log)
-        E_intra_a = self._log_partition(Q_a, Kq_a, w_log)
+        E_intra_v = self._log_partition(Q_v, Kq_v, self.cache_v.log_w_quad)
+        E_intra_a = self._log_partition(Q_a, Kq_a, self.cache_a.log_w_quad)
 
-        # Bidirectional cross: v→a AND a→v
-        E_cross = (
-            self._log_partition(Q_v, Kq_a, w_log)  # v queries a's keys
-            + self._log_partition(Q_a, Kq_v, w_log)  # a queries v's keys
-        )
+        # Cross-modal terms must use the quadrature rule of the KEY trajectory.
+        E_cross_va = self._log_partition(Q_v, Kq_a, self.cache_a.log_w_quad)
+        E_cross_av = self._log_partition(Q_a, Kq_v, self.cache_v.log_w_quad)
+        E_cross = E_cross_va + E_cross_av
 
         return E_intra_v, E_intra_a, E_cross
 

@@ -160,6 +160,8 @@ class JEPATeacher(nn.Module):
             # pred, target: (B, L, D_pred); mask: (B, L)
             p = pred[mask]   # (N_masked, D_pred)
             t = target[mask] # (N_masked, D_pred)
+            if p.numel() == 0:
+                return pred.new_zeros(())
             return F.mse_loss(p, t)
 
         loss_v = masked_mse(pred_v, teacher_eq_v, mask_v)
